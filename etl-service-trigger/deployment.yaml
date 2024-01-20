@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etl-trigger
+  namespace: your-ns
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: etl-trigger
+      version: test
+  strategy:
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: etl-trigger
+        version: test
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - etl-nodes
+      containers:
+      - command:
+        - /app/etlTrigger
+        env:
+        - name: CLICKHOUSE_NAMESPACE
+          value: clickhouse-ns
+        - name: FILE_PATH_TXN
+          value: /app/src/main.bash
+        - name: CLICKHOUSE_HOSTNAME
+          value: clickhouse-host
+        - name: SLACK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: SLACK_TOKEN
+              name: clickhouse-creds
+        - name: GOOGLE_CLOUD_KEYFILE_JSON
+          value: your_file.json
+        image: your-build-image
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 10
+        name: etl-trigger
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "2"
+            memory: 6Gi
+          requests:
+            cpu: "2"
+            memory: 6Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /trigger-pvc
+          name: trigger-data
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: value
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: value
+      serviceAccountName: value
+      terminationGracePeriodSeconds: 60
+      tolerations:
+      - effect: NoSchedule
+        key: service-type
+        operator: Equal
+        value: etl
+      volumes:
+      - name: trigger-data
+        persistentVolumeClaim:
+          claimName: trigger-pvc

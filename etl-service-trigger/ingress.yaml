@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+  name: etl-trigger-ingress
+  namespace: ckh-etl-pipes
+spec:
+  rules:
+  - host: your-service.ns.svc.cluster.local
+    http:
+      paths:
+      - backend:
+          service:
+            name: etl-app-svc
+            port:
+              number: 8090
+        path: /etl-app/(.*)
+        pathType: Prefix
+      - backend:
+          service:
+            name: etl-app-2-svc
+            port:
+              number: 8070
+        path: /etl-app-2/(.*)
+        pathType: Prefix
+      - backend:
+          service:
+            name: etl-trigger-svc
+            port:
+              number: 8080
+        path: /(.*)
+        pathType: Prefix
